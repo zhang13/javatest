@@ -1,0 +1,11 @@
+--keytool -genkey -alias yushan(别名) -keypass yushan(别名密码) -keyalg RSA(算法) -keysize 1024(密钥长度) -validity 365(有效期，天单位) -keystore e:\yushan.keystore(指定生成证书的位置和证书名称) -storepass 123456(获取keystore信息的密码) -dname "CN=(名字与姓氏), OU=(组织单位名称), O=(组织名称), L=(城市或区域名称), ST=(州或省份名称), C=(单位的两字母国家代码)";
+
+keytool -genkey -alias test -keypass admin.123 -keyalg RSA -keysize 1024 -validity 365 -keystore e:\test.keystore -storepass 123456 -dname "CN=zhangchao, OU=cdrt, O=jt, L=xi'an, ST=shannxi, C=cn"
+
+keytool -list  -rfc -keystore e:\test.keystore -storepass 123456
+
+keytool -export -alias test -keystore e:\test.keystore -file e:\test.crt -storepass 123456
+
+keytool -printcert -file e:\test.crt
+
+keytool -import -alias test -file e:\test .crt -keystore test -storepass 123456

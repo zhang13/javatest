@@ -1,0 +1,119 @@
+一、TOMCAT自签名
+1. 生成 server key ：
+以命令行方式切换到目录%TOMCAT_HOME%，在command命令行输入如下命令（jdk1.4以上带的工具）： 
+keytool -genkey -alias tomcat -keyalg RSA -keypass changeit -storepass changeit -keystore server.keystore -validity 3600 
+用户名输入域名，如localhost（开发或测试用）或hostname.domainname(用户拥有的域名)，其它全部以 enter 跳过，最后确认，此时会在%TOMCAT_HOME%下生成server.keystore 文件。
+注：参数 -validity 指证书的有效期(天)，缺省有效期很短，只有90天。
+
+2.将证书导入的JDK的证书信任库中:
+这步对于Tomcat的SSL配置不是必须，但对于CAS SSO是必须的，否则会出现如下错误：edu.yale.its.tp.cas.client.CASAuthenticationException: Unable to validate ProxyTicketValidator。。。
+导入过程分2步，第一步是导出证书，第二步是导入到证书信任库，命令如下：
+keytool -export -trustcacerts -alias tomcat -file server.cer -keystore  server.keystore -storepass changeit
+用这个命令导入其它证书链
+keytool -import -trustcacerts -alias tomcat -file server.cer -keystore  %JAVA_HOME%/jre/lib/security/cacerts -storepass changeit(是导入时用的密码)
+
+如果有提示，自己填。
+第二步出错不影响TOMCAT的SSL使用。
+其他有用keytool命令（列出信任证书库中所有已有证书，删除库中某个证书）：
+keytool -list -v -keystore D:/sdks/jdk1.5.0_11/jre/lib/security/cacerts
+keytool -delete -trustcacerts -alias tomcat  -keystore  D:/sdks/jdk1.5.0_11/jre/lib/security/cacerts -storepass changeit
+3.修改server.xml文件:
+tomcat6加以下内容在SSL下面
+  <Connector className="org.apache.catalina.connector.http.HttpConnector" 
+port="8443" protocol="HTTP/1.1" SSLEnabled="true" 
+               maxThreads="150" scheme="https" secure="true" 
+               keystoreFile="d:/program files/java/jre6/bin/server.keystore" keystorePass="changeit"
+   clientAuth="false" sslProtocol="TLS" />
+4.可以访问了。
+
+5.双向认证：
+修改 clientAuth="false" 为 clientAuth="true" 即可。
+6.签发用户证书
+
+7.读取客户端证书项。
+JAVA中：
+<%@ page  import="java.security.cert.X509Certificate" contentType="text/html; charset=GB2312" %>
+<pre>
+<%
+    java.security.cert.X509Certificate[] certs=null;
+    try{
+            certs=(X509Certificate[])request.getAttribute("javax.servlet.request.X509Certificate");
+
+                if (certs == null) {
+                        out.println("No certificates");
+                } else if (certs.length == 0) {
+                        out.println("Certificates length is 0");
+                } else {
+                        java.security.cert.X509Certificate cert = certs[0];
+                        String dn = cert.getSubjectX500Principal().toString();
+                        out.println("SubjectDN: " + dn);
+                        out.println();
+                        out.println("------------------certification detail--------------------");
+                        out.println(cert);
+                        out.println("----------------------------------------------------------");
+                }
+    } catch(Exception e){
+                out.println("Exception=" + e.getMessage());
+    }
+//如果只打印DN
+out.println( (((X509Certificate[])request.getAttribute("javax.servlet.request.X509Certificate"))[0].getSubjectX500Principal().toString()));
+%>
+</pre>
+
+二、用OPENSSL签发
+1.生成自签密钥对
+openssl genrsa -des3 -out key/cakey.pem 1024
+输入密码，如123456
+2.生成自签名根证书
+openssl req -new -x509 -days 3650 -key key/cakey.pem -out cacert.pem -config openssl.cnf
+3.用openssl为tomcat生成密钥对
+openssl req -newkey rsa:1024 -keyout key/serverkey.pem -keyform PEM -out req/serverreq.pem -config openssl.cnf
+4.用openssl签发设备证书
+openssl ca -in req/serverreq.pem -out servercert.cer -cert cacert.pem -keyfile key/cakey.pem(用哪个根签，指定私钥) -notext -config openssl.cnf -days 3600
+如果报“The organizationName field needed to be the same in the”之类的错误，修改openssl.cnf文件(用EDITPLUS打开)中CA_default节中的policy = policy_match为policy = policy_anything(76行)
+5.生成P12设备证书
+openssl pkcs12 -export -in servercert.cer -inkey key/serverkey.pem  -out server.p12 -name server -CAfile key/cacert.pem 
+6.在TOMCAT中导入信任证书链(openssl自签的根证书)
+keytool -import -v -trustcacerts  -alias my_ca_root -file cacert.pem -storepass changeit -keystore server.keystore
+7.在TOMCAT中启用这个证书
+把server.p12和server.keystore拷到TOMCAT下的conf/下。
+修改server.xml，增加以下内容：
+keystoreFile="conf/server.p12" keystorePass="111111" keystoreType="PKCS12" 
+               truststoreFile="conf/server.keystore" truststorePass="changeit" truststoreType="JKS"
+可以删除server.keystore，重做；只能指定一个服务器证书。
+
+8.查看server端证书
+   keytool -list -v -keystore server.keystore  
+9.签发客户端证书：
+A：生成密钥对
+openssl genrsa -des3 -out client.key 1024
+B：生成请求
+openssl req -new -key client.key -out client.csr -config openssl.cnf
+C：签发证书(1800天)
+openssl ca -in client.csr -out client.crt -cert cacert.pem -keyfile key/cakey.pem -notext -config openssl.cnf -days 1800
+D：导出为P12格式
+openssl pkcs12 -export -inkey client.key -in client.crt -out client.p12
+
+
+三、用java申请，第三方CA签发证书
+1、生成密钥
+keytool -keystore tomcat.jks -keypass 222222 -storepass 222222 -alias tomcat -genkey -keyalg RSA 
+2、生成证书请
+keytool -keystore tomcat.jks -keypass 222222 -storepass 222222 -alias tomcat -certreq -file serverreq.pem
+3、用第三方CA签发证书
+openssl ca -in serverreq.pem -out servercert.pem -config openssl.cnf -cert cacert.pem -keyfile key/cakey.pem(用哪个根签，指定私钥) -notext -days 3600
+4、先导入CA的证书：
+keytool -keystore tomcat.jks -keypass 222222 -storepass 222222 -alias ca -import -trustcacerts -file cacert.pem
+5、再导入服务器证书：
+keytool -keystore tomcat.jks -keypass 222222 -storepass 222222 -alias tomcat -import -file servercert.pem
+6、导入信任链
+keytool -keystore truststore.jks -keypass 222222 -storepass 222222 -alias ca -import -trustcacerts -file cacert.pem
+7、修改server.xml文件
+   <Connector port="8443"
+               maxThreads="150" minSpareThreads="25" maxSpareThreads="75"
+               enableLookups="false" disableUploadTimeout="true"
+               acceptCount="100" debug="0" scheme="https" secure="true"
+               clientAuth="true" sslProtocol="TLS"
+               keystoreFile="conf/tomcat.jks" keystorePass="222222" keystoreType="JKS" 
+      truststoreFile="conf/truststore.jks" truststorePass="222222" truststoreType="JKS" />
+8、重启TOMCAT服务。  
