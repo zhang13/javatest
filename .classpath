@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="src" path="src"/>
+	<classpathentry kind="src" path="test/unit"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/jdk1.8">
+		<attributes>
+			<attribute name="owner.project.facets" value="java"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="libs/easymock-3.0.jar"/>
+	<classpathentry kind="lib" path="libs/easymockclassextension-2.2.jar"/>
+	<classpathentry kind="lib" path="libs/hutool-all-3.0.6-sources.jar"/>
+	<classpathentry kind="lib" path="libs/hutool-all-3.0.6.jar" sourcepath="libs/hutool-all-3.0.6-sources.jar"/>
+	<classpathentry kind="lib" path="libs/jna.jar"/>
+	<classpathentry kind="lib" path="libs/JNative.jar"/>
+	<classpathentry kind="lib" path="libs/mysql-connector-java-5.0.4-bin.jar"/>
+	<classpathentry kind="lib" path="libs/net.sf.jadclipse_3.3.0.jar"/>
+	<classpathentry kind="lib" path="libs/ojdbc14.jar"/>
+	<classpathentry kind="lib" path="libs/sqljdbc4.jar"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.junit.JUNIT_CONTAINER/4"/>
+	<classpathentry kind="output" path="bin"/>
+</classpath>
